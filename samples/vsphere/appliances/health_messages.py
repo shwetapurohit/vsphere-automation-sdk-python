@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 * *******************************************************
-* Copyright (c) VMware, Inc. 2017. All Rights Reserved.
+* Copyright (c) VMware, Inc. 2019. All Rights Reserved.
 * SPDX-License-Identifier: MIT
 * *******************************************************
 *
@@ -13,67 +13,65 @@
 """
 
 __author__ = 'VMware, Inc.'
-__copyright__ = 'Copyright 2017 VMware, Inc. All rights reserved.'
 __vcenter_version__ = '6.7+'
 
-from samples.vsphere.common import sample_cli
-from samples.vsphere.common import sample_util
-from samples.vsphere.common import vapiconnect
-from com.vmware.appliance_client import Health 
+from samples.vsphere.common import (sample_cli, sample_util)
+from com.vmware.appliance_client import Health
 from com.vmware.vapi.std_client import LocalizableMessage
+from com.vmware.appliance_client import Notification
+from vmware.vapi.vsphere.client import create_vsphere_client
+from samples.vsphere.common.ssl_helper import get_unverified_session
 
-class HealthMessages(object) :
+
+class HealthMessages(object):
     """
-    Demonstrates getting Health messages for various health items
+    Demonstrates getting Health messages for memory, storage and cpu
 
     Retrieves Health messages details from vCenter and prints the data
 
     """
 
-
     def __init__(self):
         self.item = None
-        self.stub_config = None
-
-    def setup(self):
+        self.client = None
         parser = sample_cli.build_arg_parser()
+
         parser.add_argument(
             '--item',
             required=True,
             action='store',
-            choices=['memory', 'cpu' , 'storage'],
+            choices=['memory', 'cpu', 'storage'],
             help='Specify the name of health item to view the messages')
+
         args = sample_util.process_cli_args(parser.parse_args())
         self.item = args.item
-
-    # Connect to vAPI services
-        self.stub_config = vapiconnect.connect(
-            host=args.server,
-            user=args.username,
-            pwd=args.password,
-            skip_verification=args.skipverification)
-
-        self.health_client = Health(self.stub_config)
+        # Connect to vAPI services
+        session = get_unverified_session() if args.skipverification else None
+        self.client = create_vsphere_client(server=args.server,
+                                            username=args.username,
+                                            password=args.password,
+                                            session=session)
+        self.health_client = Health(self.client._stub_config)
 
     def run(self):
         message_list = self.health_client.messages(self.item)
-        print(" Health Alarams")
+        print("Health Alarams")
         print("-------------------\n")
         if not message_list:
             print("No health alarms for : " + self.item)
         else:
-            for message in message_list :
-                print("Alert time : " + message.getTime())
-                print("Alert message Id: " + message.getId())
-                msg = message.getMessage()
-                def_message = LocalizableMessage(msg.default_message)
-                print("Alert message : "+ def_message)
+            for message in message_list:
+                print("Alert time : {}".format(message.time))
+                print("Alert message Id: " + message.id)
+                local_message = message.message
+                default_msg = local_message.default_message
+                print("Alert message : " + default_msg)
 
 
 def main():
     health_sample = HealthMessages()
-    health_sample.setup()
     health_sample.run()
+
 
 if __name__ == '__main__':
     main()
